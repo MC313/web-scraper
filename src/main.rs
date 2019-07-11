@@ -25,6 +25,7 @@ fn main() {
     let search_button_css_id: &str = "MainContent_cmdSearch";
     let search_field_css_id: &str = "MainContent_txtFilingName";
     let search_results_css_class: &str = ".search-results";
+    let search_result_css_selector: &str = ".search-results li";
 
     let c = Client::new("http://localhost:4444");
     let args = Cli::from_args();
@@ -33,32 +34,25 @@ fn main() {
     tokio::run(
         c.map_err(|e| unimplemented!("failed to connect to WebDriver: {:?}", e))
             .and_then(|c| c.goto("https://wyobiz.wy.gov/business/filingsearch.aspx"))
-            .and_then(move |mut c| {
-                c.form(Locator::Id(search_field_css_id))
-                    .map(move |x| (c, x))
-            })
-            .and_then(move |(c, mut search_field)| {
+            .and_then(move |mut c| c.form(Locator::Id(search_field_css_id)))
+            .and_then(move |mut search_field| {
                 search_field
                     .set(Locator::Id(search_field_css_id), &args.search_term)
-                    .map(move |x| (c, x))
+                    .map(|element| element.client())
             })
-            .and_then(move |(mut c, _)| {
-                c.find(Locator::Id(search_button_css_id))
-                    .map(move |x| (c, x))
-            })
-            .and_then(move |(c, button)| button.click().map(move |x| (c, x)))
-            .and_then(move |(c, _)| {
+            .and_then(move |mut c| c.find(Locator::Id(search_button_css_id)))
+            .and_then(|button| button.click())
+            .and_then(move |c| {
                 c.wait_for_find(Locator::Css(search_results_css_class))
                     .map(|e| e.client())
             })
-            .and_then(|c| {
-                Delay::new(Instant::now() + Duration::from_secs(3))
-                    .map_err(|e| {
-                        panic!("a Duration failed: {:?}", e);
-                    })
-                    .map(move |x| (c, x))
+            .and_then(move |mut c| c.find_all(Locator::Css(search_result_css_selector)))
+            .and_then(|mut list_items| {
+                list_items.map(|li| li.html())
             })
-            .and_then(|_| Ok(()))
+            .and_then(|c| {
+                Ok(())
+            })
             .map_err(|e| {
                 panic!("a WebDriver command failed: {:?}", e);
             }),
